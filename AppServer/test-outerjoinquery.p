@@ -3,13 +3,13 @@ USING Progress.Json.ObjectModel.JsonArray.
 
 /* Define Temp Table To Save part number  */
 DEFINE TEMP-TABLE ttSpartData
-    FIELD branch            LIKE brctable.CODE
-    FIELD agency            LIKE cpmf.agency
-    FIELD partno            LIKE cpmf.partno
-    FIELD D                 AS INT64        EXTENT 13  /* Demand Per Month */ 
-    FIELD FD                AS DECIMAL                 /* Forcast Demand of Target Month */
-    FIELD DemandFrom        AS CHARACTER    EXTENT 13  /* Test Query */
-    FIELD ForecastDemandTarget AS CHARACTER           /* Test Query */      
+    FIELD branch                LIKE brctable.CODE
+    FIELD agency                LIKE cpmf.agency
+    FIELD partno                LIKE cpmf.partno
+    FIELD D                     AS INT64       EXTENT 13   /* Demand Per Month */ 
+    FIELD FD                    AS DECIMAL                 /* Forcast Demand of Target Month */
+    FIELD DemandFrom            AS CHARACTER   EXTENT 13   /* Test Query */
+    FIELD ForecastDemandTarget  AS CHARACTER               /* Test Query */      
     .
     
 DEFINE VARIABLE ix              AS INTEGER     NO-UNDO.
@@ -23,8 +23,19 @@ DEFINE VARIABLE daEndDate       AS DATE        NO-UNDO.
 DEFINE VARIABLE hQuery          AS HANDLE      NO-UNDO.
 DEFINE VARIABLE hBuffer         AS HANDLE      NO-UNDO EXTENT 2.
 
-
-
+/* Function */
+FUNCTION excludeOlderLastActData RETURN LOGICAL (INPUT iphBuffer AS HANDLE):
+    /* Find SPARTQTY LASTACT Older than November Previous Year 
+     * IF Available, the data is skipped 
+     */
+    FIND FIRST spartqty WHERE
+            iphBuffer:BUFFER-FIELD('agency'):BUFFER-VALUE() = spartqty.agency AND
+            iphBuffer:BUFFER-FIELD('brc'):BUFFER-VALUE()    = spartqty.brc AND
+            iphBuffer:BUFFER-FIELD('partno'):BUFFER-VALUE() = spartqty.partno AND
+            spartqty.lastact < DATE(11, 1, YEAR(TODAY) - 1) 
+            NO-LOCK NO-ERROR.
+        IF AVAILABLE spartqty THEN RETURN TRUE.
+END.
 RUN Main.
 
 /* Query The Data
@@ -33,7 +44,7 @@ PROCEDURE Main:
 
     /* Target Date As MM,DD,YY */
     ASSIGN 
-        daTargetDate = DATE(7,1,2024)
+        daTargetDate = DATE(MONTH(TODAY),1,YEAR(TODAY))
         daStartDate  = ADD-INTERVAL(daTargetDate, -13, "MONTH") 
         daEndDate    = ADD-INTERVAL(daTargetDate, -1, "MONTH").
      
@@ -43,9 +54,10 @@ PROCEDURE Main:
     
     RUN QueryData(MONTH(daStartDate), 12, hBuffer[1], FALSE).
     RUN QueryData(1, MONTH(daEndDate), hBuffer[2], TRUE).
+    RUN AddOuterData(1, MONTH(daEndDate), hBuffer[2]).
     
     /* Test The Value ======================== */
-    TEMP-TABLE ttSpartData:WRITE-JSON('FILE', "C:\Users\User\Desktop\aaa.txt", TRUE).
+    TEMP-TABLE ttSpartData:WRITE-JSON('FILE', "C:\Users\User\Desktop\bbb.txt", TRUE).
     
     /* Memory Clean Up */
     DO ix = 1 TO EXTENT(hBuffer):
@@ -53,6 +65,50 @@ PROCEDURE Main:
     END.
     IF VALID-HANDLE(hQuery) THEN DELETE OBJECT hQuery.
 
+END PROCEDURE.
+
+
+
+PROCEDURE AddOuterData:
+    /* Outer Join the data so all right table still included */
+    /* Get The Right Table And Create New Row if not exist on ttSpartData */
+    DEFINE INPUT  PARAMETER ipiStartMonth  AS INTEGER     NO-UNDO.
+    DEFINE INPUT  PARAMETER ipiEndMonth    AS INTEGER     NO-UNDO.
+    DEFINE INPUT  PARAMETER iphBuffer      AS HANDLE      NO-UNDO.
+
+    CREATE QUERY hQuery.
+    hQuery:SET-BUFFERS(iphBuffer).
+    hQuery:QUERY-PREPARE("FOR EACH " + iphBuffer:NAME + " NO-LOCK").
+    hQuery:QUERY-OPEN.
+
+    ASSIGN ix = 1.
+    DO WHILE hQuery:GET-NEXT() AND ix < 100:
+        
+        /* Function To Exclude Older SpareParts Data */
+        IF excludeOlderLastActData(iphBuffer) THEN NEXT.
+        
+        ASSIGN ix = ix + 1.
+        
+        FIND FIRST ttSpartData WHERE
+            ttSpartData.branch = iphBuffer:BUFFER-FIELD('brc'):BUFFER-VALUE() AND 
+            ttSpartData.agency = iphBuffer:BUFFER-FIELD('agency'):BUFFER-VALUE() AND
+            ttSpartData.partno = iphBuffer:BUFFER-FIELD('partno'):BUFFER-VALUE()
+            NO-LOCK NO-ERROR.    
+        IF AVAILABLE ttSpartData THEN NEXT.
+        ELSE DO:
+            CREATE ttSpartData.
+            ASSIGN
+                ttSpartData.branch = iphBuffer:BUFFER-FIELD('brc'):BUFFER-VALUE()
+                ttSpartData.agency = iphBuffer:BUFFER-FIELD('agency'):BUFFER-VALUE()
+                ttSpartData.partno = iphBuffer:BUFFER-FIELD('partno'):BUFFER-VALUE()
+                . 
+                
+            ASSIGN ip = 14 - ipiEndMonth.  
+            RUN AddData(ip, ipiStartMonth, ipiEndMonth, iphBuffer).
+            ASSIGN ttSpartData.ForecastDemandTarget = "target MMYY " + STRING(MONTH(daTargetDate)) + " " + STRING(YEAR(daTargetDate)).
+        END.
+    END.
+    hQuery:QUERY-CLOSE(). 
 END PROCEDURE.
 
 PROCEDURE QueryData:
@@ -69,6 +125,9 @@ PROCEDURE QueryData:
     ASSIGN ix = 1.
     DO WHILE hQuery:GET-NEXT() AND ix < 100:
         ASSIGN ix = ix + 1.
+        
+        /* Function To Exclude Older SpareParts Data */
+        IF excludeOlderLastActData(iphBuffer) THEN NEXT.
         
         /* If Create New Data */
         IF NOT iplAddData THEN DO:
