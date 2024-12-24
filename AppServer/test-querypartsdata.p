@@ -6,14 +6,15 @@ DEFINE TEMP-TABLE ttSpartData
     FIELD branch            LIKE brctable.CODE
     FIELD agency            LIKE cpmf.agency
     FIELD partno            LIKE cpmf.partno
-    FIELD D                 AS INT64 EXTENT 12 /* Demand Per Month */ 
-    FIELD DT                AS CHARACTER EXTENT 12 /* Test Query */
+    FIELD D                 AS INT64 EXTENT 13 /* Demand Per Month */ 
+    FIELD DT                AS CHARACTER EXTENT 13 /* Test Query */
     FIELD FD                AS DECIMAL    /* Forcast Demand of Target Month */
     FIELD FDT               AS C.        
 
 DEFINE VARIABLE ix              AS INTEGER     NO-UNDO.
 DEFINE VARIABLE iy              AS INTEGER     NO-UNDO.
 DEFINE VARIABLE iz              AS INTEGER     NO-UNDO.
+DEFINE VARIABLE ip              AS INTEGER     NO-UNDO. /* Pointer to D[P] */
 DEFINE VARIABLE cFindQuery      AS CHARACTER   NO-UNDO.   
 DEFINE VARIABLE lFindResult     AS LOGICAL     NO-UNDO.
 
@@ -39,24 +40,21 @@ PROCEDURE Main:
 
     /* Previous Year Table Always will used */
     CREATE BUFFER hBuffer[1] FOR TABLE "sparthis" + STRING(iTargetYear - 1).
+    /*CREATE BUFFER hBuffer[2] FOR TABLE "sparthis" + STRING(iTargetYear).  */
 
     /* First : Determine If Using Different Year Or Not */
-    IF iTargetMonth > 1 THEN DO:
-        CREATE BUFFER hBuffer[2] FOR TABLE "sparthis" + STRING(iTargetYear).                                   
-        RUN QueryData(INPUT 1, INPUT iTargetMonth - 1, INPUT hBuffer[1]).
-        RUN QueryData(INPUT 1, INPUT iTargetMonth, INPUT hBuffer[2]).
+    IF iTargetMonth > 1 THEN DO:                                   
+        RUN QueryData(iTargetMonth - 1, 12, hBuffer[1], FALSE).
+        RUN QueryData(1, iTargetMonth - 1, hBuffer[2], TRUE).
     END.
     /* Else if target month is january, query all 12 month of previous period */
     ELSE DO:
-        RUN QueryData(INPUT 1, INPUT iTargetMonth - 1, INPUT hBuffer[1]).
-    END.
+        RUN QueryData(1, 12, hBuffer[1], FALSE).
+    END.  
     
-    /* Test The Value */
-    DEFINE VARIABLE aaa AS LONGCHAR      NO-UNDO.
-    TEMP-TABLE ttSpartData:WRITE-JSON('Longchar', aaa, TRUE).
-    MESSAGE STRING(aaa)
-        VIEW-AS ALERT-BOX INFORMATION BUTTONS OK.
-
+    /* Test The Value ======================== */
+    TEMP-TABLE ttSpartData:WRITE-JSON('FILE', "C:\Users\User\Desktop\aaa.txt", TRUE).
+    
     /* Memory Clean Up */
     DO ix = 1 TO EXTENT(hBuffer):
         IF VALID-HANDLE(hBuffer[ix]) THEN DELETE OBJECT hBuffer[ix].
@@ -69,6 +67,7 @@ PROCEDURE QueryData:
     DEFINE INPUT  PARAMETER ipiStartMonth  AS INTEGER     NO-UNDO.
     DEFINE INPUT  PARAMETER ipiEndMonth    AS INTEGER     NO-UNDO.
     DEFINE INPUT  PARAMETER iphBuffer      AS HANDLE      NO-UNDO.
+    DEFINE INPUT  PARAMETER iplAddData     AS LOGICAL     NO-UNDO.
 
     CREATE QUERY hQuery.
     hQuery:SET-BUFFERS(iphBuffer).
@@ -78,24 +77,64 @@ PROCEDURE QueryData:
     ASSIGN ix = 1.
     DO WHILE hQuery:GET-NEXT() AND ix < 10:
         ASSIGN ix = ix + 1.
-        CREATE ttSpartData.
-        ASSIGN
-            ttSpartData.branch = iphBuffer:BUFFER-FIELD('brc'):BUFFER-VALUE()
-            ttSpartData.agency = iphBuffer:BUFFER-FIELD('agency'):BUFFER-VALUE()
-            ttSpartData.partno = iphBuffer:BUFFER-FIELD('partno'):BUFFER-VALUE()
-            .
-        DO iy = ipiStartMonth TO ipiEndMonth:
-            ASSIGN 
-                ttSpartData.D[iy] = iphBuffer:BUFFER-FIELD('psi'):BUFFER-VALUE(iy)
-                ttSpartData.DT[iy] = 'month ' + STRING(iy) + ' year ' + STRING(iEndYear) /* debug */
-            .
-        END.
         
-        ASSIGN
-            ttSpartData.FDT = "target MMYY " + STRING(iTargetMonth) + " " + STRING(iTargetYear) /* debug */ 
-            .
+        /* If Create New Data */
+        IF NOT iplAddData THEN DO:
+            CREATE ttSpartData.
+            ASSIGN
+                ttSpartData.branch = iphBuffer:BUFFER-FIELD('brc'):BUFFER-VALUE()
+                ttSpartData.agency = iphBuffer:BUFFER-FIELD('agency'):BUFFER-VALUE()
+                ttSpartData.partno = iphBuffer:BUFFER-FIELD('partno'):BUFFER-VALUE()
+                .
+                
+            ASSIGN ip = 1.  
+            RUN AddData(ip, ipiStartMonth, ipiEndMonth, iphBuffer).
+            /*DO iy = ipiStartMonth TO ipiEndMonth:
+                ASSIGN 
+                    ttSpartData.D[ip] = iphBuffer:BUFFER-FIELD('psi'):BUFFER-VALUE(iy)
+                    ttSpartData.DT[ip] = 'month ' + STRING(iy) + ' year ' + iphBuffer:NAME /* debug */
+                    ip = ip + 1.
+            END.  */
+            
+            ASSIGN
+                ttSpartData.FDT = "target MMYY " + STRING(iTargetMonth) + " " + STRING(INT(SUBSTR(iphBuffer:NAME, 9, 2)) + 1). /* debug */  
+        END.
+        /* If Querying Second Table To Add Data */
+        ELSE DO:
+            FIND FIRST ttSpartData WHERE
+                ttSpartData.branch = iphBuffer:BUFFER-FIELD('brc'):BUFFER-VALUE() AND 
+                ttSpartData.agency = iphBuffer:BUFFER-FIELD('agency'):BUFFER-VALUE() AND
+                ttSpartData.partno = iphBuffer:BUFFER-FIELD('partno'):BUFFER-VALUE()
+                EXCLUSIVE-LOCK NO-ERROR.
+                
+            IF AVAILABLE ttSpartData THEN DO:
+                ASSIGN ip = iTargetMonth.
+                RUN AddData(ip, ipiStartMonth, ipiEndMonth, iphBuffer).
+                /*DO iy = ipiStartMonth TO ipiEndMonth:
+                    ASSIGN 
+                        ttSpartData.D[ip] = iphBuffer:BUFFER-FIELD('psi'):BUFFER-VALUE(iy)
+                        ttSpartData.DT[ip] = 'month ' + STRING(iy) + ' year ' + iphBuffer:NAME /* debug */
+                        ip = ip + 1.
+                END.    */
+            END.      
+        END.
     END.
     hQuery:QUERY-CLOSE().     
+
+END PROCEDURE.
+
+PROCEDURE AddData:
+    DEFINE INPUT  PARAMETER ip             AS INTEGER     NO-UNDO.
+    DEFINE INPUT  PARAMETER ipiStartMonth  AS INTEGER     NO-UNDO.
+    DEFINE INPUT  PARAMETER ipiEndMonth    AS INTEGER     NO-UNDO.
+    DEFINE INPUT  PARAMETER iphBuffer      AS HANDLE      NO-UNDO.
+
+    DO iy = ipiStartMonth TO ipiEndMonth:
+        ASSIGN 
+            ttSpartData.D[ip] = iphBuffer:BUFFER-FIELD('psi'):BUFFER-VALUE(iy)
+            ttSpartData.DT[ip] = 'month ' + STRING(iy) + ' year ' + iphBuffer:NAME /* debug */
+            ip = ip + 1.
+    END.     
 
 END PROCEDURE.
 
