@@ -185,12 +185,3 @@ PROCEDURE AddData:
             ip = ip + 1.  
     END.     
 END PROCEDURE.
-
-
-
-
-
-
-
-
-
