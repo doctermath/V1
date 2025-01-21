@@ -14,34 +14,25 @@ FUNCTION LOG RETURN INTEGER (INPUT msg AS CHARACTER):
         VIEW-AS ALERT-BOX.
 END.
 
-FOR EACH tmptbl WHERE prtid = 'yordan':
-    LOG('Deleting TMPTBL ' + prtid + ' ' + char1).
-    DELETE tmptbl.
-END.
+DEFINE VARIABLE oJsonIn AS JsonObject NO-UNDO.
+DEFINE VARIABLE oJsonOut AS JsonObject NO-UNDO.
 
-REPEAT ix = 1 TO 65000:
-    CREATE tmptbl.
-    ASSIGN 
-        prtid = 'yordan' 
-        char1 = 'seq ' + STRING(ix, "9999999").
-    LOG('Created TMPTBL ' + prtid + ' ' + char1).
-END.
+/* Input Parameter for sourcer  */ 
+oJsonIn = NEW JsonObject().
+oJsonIn:Add('start-date', poRequest:URI:GetQueryValue('start-date')).
+oJsonIn:Add('end-date', poRequest:URI:GetQueryValue('end-date')).
+oJsonIn:Add('exclude-older', poRequest:URI:GetQueryValue('exclude-older')).
+oJsonIn:Add('branch', poRequest:URI:GetQueryValue('branch')).
+oJsonIn:Add('agency', poRequest:URI:GetQueryValue('agency')).
+oJsonIn:Add('partno', porequest:URI:GetQueryValue('partno')).
 
+RUN Logic/gdmdcall.p(INPUT oJsonIn, OUTPUT oJsonOut).
 
-/*DO ix = 1 TO 10000 ON ERROR UNDO, LEAVE:
-    CREATE tmptbl.
-    ASSIGN 
-        prtid = 'yordan' 
-        char1 = 'seq ' + STRING(ix).
-    LOG('Created TMPTBL ' + prtid + ' ' + char1).
-    RELEASE tmptbl.
-END.*/
-    
+oJson:Add('start-date', oJsonIn:GetDate("start-date")).
+oJson:Add('end-date', oJsonIn:GetDate("end-date")).
+oJson:Add('data-count', oJsonOut:GetInteger("data-count")).
+oJson:Add('month-count', oJsonOut:GetInteger("month-count")).
+oJson:Add('year-count', oJsonOut:GetInteger("year-count")).
+oJson:Add('data', oJsonOut:GetJsonArray('data')).
 
-FOR EACH tmptbl WHERE prtid = 'yordan':
-    LOG('Creating JSON Record ' + char1).
-    oJson:Add(char1, prtid).
-    
-END.
- 
     

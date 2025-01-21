@@ -29,11 +29,16 @@ CLASS V1Handler INHERITS WebHandler:
             oResponse            = NEW OpenEdge.Web.WebResponse()
             oJson                = NEW JsonObject()
             oResponse:StatusCode = 200.
-
         
         /* URI Conditioning */
         cUri = RIGHT-TRIM(poRequest:UriTemplate, '/':u).
         CASE cUri:
+            WHEN '/test13' THEN 
+            RUN Programs/Test13.p (poRequest, oJson).
+            
+            WHEN '/test12' THEN 
+            RUN Programs/Test12.p (poRequest, oJson).
+            
             /* Test1 */
             WHEN '/test1' THEN 
             RUN Programs/Test1.p (poRequest, oJson).
@@ -87,6 +92,10 @@ CLASS V1Handler INHERITS WebHandler:
             /*  */
             WHEN '/test1-post' THEN 
             RUN Programs/Test1-post.p (poRequest, oJson).
+            
+            /*  */
+            WHEN '/test9-post' THEN 
+            RUN Programs/Test9-post.p (poRequest, oJson).
     
         END CASE.
            

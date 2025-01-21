@@ -6,12 +6,8 @@
 <b:beans xmlns="http://www.springframework.org/schema/security"
     xmlns:b="http://www.springframework.org/schema/beans"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
-                        http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security.xsd">
-
-    <b:bean 
-        class="org.springframework.web.servlet.handler.HandlerMappingIntrospector" 
-        name="mvcHandlerMappingIntrospector"/> 
+    xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.3.xsd
+                        http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-4.2.xsd">
     
  
     <!-- *********************************************************************
@@ -69,6 +65,6 @@
          process configuration, process beans, and all of the 
          AuthenticationManager declarations for the supported 
          user account sources. -->
-    <b:import resource="pasoe:${client.login.model}LoginModel.xml"/> 
+    <b:import resource="spring/${client.login.model}LoginModel.xml"/> 
 
 </b:beans>

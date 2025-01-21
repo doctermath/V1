@@ -3,14 +3,13 @@
 "/apsv/**","HEAD","hasAnyRole('ROLE_PSCUser')"
 "/apsv/**","GET","hasAnyRole('ROLE_PSCUser')"
 "/apsv/**","POST","hasAnyRole('ROLE_PSCUser')"
-"/apsv/**","OPTIONS","hasAnyRole('ROLE_PSCUser')"
+#"/apsv/**","OPTIONS","hasAnyRole('ROLE_PSCUser')"
 ############## APSV Container Login model Configuration ###############
 #"/apsv/**","OPTIONS","hasAnyRole('ROLE_PSCUser','ROLE_ANONYMOUS')"
 
 ############## Intercept-url definitions for the SOAP transport URIs ###############
 "/soap/wsdl/**","GET","hasAnyRole('ROLE_PSCUser')"
 "/soap/**","POST","hasAnyRole('ROLE_PSCUser')"
-"/soap/**","GET","permitAll()"
 
 ############## Intercept-url definitions for the REST transport URIs ###############
 "/rest/**","*","hasAnyRole('ROLE_PSCUser')"

@@ -64,10 +64,10 @@ REPEAT WHILE hQuery:GET-NEXT():
         tmptbl.char2 = hBuffer:BUFFER-FIELD('branch'):BUFFER-VALUE()
         tmptbl.char3 = hBuffer:BUFFER-FIELD('agency'):BUFFER-VALUE()
         tmptbl.char4 = hBuffer:BUFFER-FIELD('partno'):BUFFER-VALUE()
-        tmptbl.int1  = hBuffer:BUFFER-FIELD('FD'):BUFFER-VALUE()
-        tmptbl.dec1  = hBuffer:BUFFER-FIELD('mean_12'):BUFFER-VALUE()
-        tmptbl.dec2  = hBuffer:BUFFER-FIELD('std_12'):BUFFER-VALUE()
-        tmptbl.dec3  = hBuffer:BUFFER-FIELD('ub'):BUFFER-VALUE()
+        tmptbl.int1  = hBuffer:BUFFER-FIELD('FD'):BUFFER-VALUE()        /* Forecast Demand */
+        tmptbl.dec1  = hBuffer:BUFFER-FIELD('mean_12'):BUFFER-VALUE()   /* Mean(AVG) of First 12 data */
+        tmptbl.dec2  = hBuffer:BUFFER-FIELD('std_12'):BUFFER-VALUE()    /* Standard Deviation of First 12 data */
+        tmptbl.dec3  = hBuffer:BUFFER-FIELD('ub'):BUFFER-VALUE()        /* Upper Bound of First 12 data */
         .
 
     /*MESSAGE 'Created TMPTBL No' ix 'Data :' prtid char4 

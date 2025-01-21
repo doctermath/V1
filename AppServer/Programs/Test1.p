@@ -19,7 +19,8 @@ DEFINE TEMP-TABLE ttSpartData
     FIELD D      AS INT64   EXTENT 13       /* Demand Per Month */ 
     FIELD FD     AS DECIMAL                 /* Forcast Demand of Target Month */
     FIELD DemandFrom            AS CHARACTER   EXTENT 13   /* Test Query */
-    FIELD ForecastDemandTarget  AS CHARACTER               /* Test Query */      
+    FIELD ForecastDemandTarget  AS CHARACTER               /* Test Query */
+    INDEX idx1 AS PRIMARY branch agency partno      
     .
 
 DEFINE TEMP-TABLE ttSpartData2 LIKE ttSpartData.
@@ -28,7 +29,7 @@ DEFINE TEMP-TABLE ttSpartData2 LIKE ttSpartData.
 --------------------------------------------------------------------------------*/
 DEFINE VARIABLE oJsonArr     AS JsonArray NO-UNDO. 
     
-DEFINE VARIABLE iCount       AS INTEGER NO-UNDO.
+DEFINE VARIABLE iCount       AS INTEGER   NO-UNDO.
 DEFINE VARIABLE ix           AS INTEGER   NO-UNDO.
 DEFINE VARIABLE iy           AS INTEGER   NO-UNDO.
 DEFINE VARIABLE iz           AS INTEGER   NO-UNDO.
@@ -77,7 +78,7 @@ END.
 --------------------------------------------------------------------------------*/
 DO ON ERROR UNDO, LEAVE:
     ASSIGN 
-        iLimitRow  = 0
+        iLimitRow  = 10000
         lAllBranch = LOGICAL(poRequest:URI:GetQueryValue('all-branch')) 
         dtPeriod   = DATE(MONTH(TODAY),1,YEAR(TODAY)). // ONLY FOR DUMMY DATA
     
@@ -227,7 +228,7 @@ PROCEDURE AddOuterData:
                 ip = 14 - ipiEndMonth.  
             RUN AddData(ip, ipiStartMonth, ipiEndMonth, iphBuffer).
             ASSIGN ttSpartData.ForecastDemandTarget = "target MMYY " + STRING(MONTH(daTargetDate)) + " " + STRING(YEAR(daTargetDate)).
-        END.
+        END. 
     END.
     hQuery:QUERY-CLOSE(). 
 END PROCEDURE.
